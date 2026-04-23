@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "Patient": {
+      "title": "Patient",
+      "description": "Hospital record for a pregnant patient",
+      "type": "object",
+      "properties": {
+        "fileNumber": { "type": "string", "description": "Unique hospital file number" },
+        "dob": { "type": "string", "format": "date", "description": "Date of birth" },
+        "name": { "type": "string", "description": "Full name" },
+        "pregnancyStartDate": { "type": "string", "format": "date-time" },
+        "bloodType": { "type": "string" },
+        "hospitalName": { "type": "string" }
+      },
+      "required": ["fileNumber", "dob", "name"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Medical appointment record",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "format": "date-time" },
+        "type": { "type": "string" },
+        "doctor": { "type": "string" },
+        "status": { "enum": ["scheduled", "completed", "cancelled"] }
+      }
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Message in the AI assistant chat",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "sender": { "enum": ["user", "ai"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/patients/{fileNumber}": {
+      "schema": "Patient",
+      "description": "Protected patient profile data"
+    },
+    "/patients/{fileNumber}/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Patient medical appointments"
+    },
+    "/users/{userId}/chats/{chatId}": {
+      "schema": "ChatMessage",
+      "description": "User specific chat history with AI"
+    }
+  }
+}

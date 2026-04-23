@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // --- Collections ---
+
+    // 1. Users (Private Profiles)
+    match /users/{userId} {
+      allow get: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId &&
+                    incoming().keys().hasAll(['patientFileNumber', 'createdAt']) &&
+                    incoming().createdAt == request.time;
+      allow update: if isSignedIn() && request.auth.uid == userId &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['patientFileNumber']);
+
+      // 1.1 Chat History
+      match /chats/{chatId} {
+        allow list, get: if isSignedIn() && request.auth.uid == userId;
+        allow create: if isSignedIn() && request.auth.uid == userId &&
+                      isValidChatMessage(incoming());
+      }
+    }
+
+    // 2. Patients (Hospital Side)
+    match /patients/{fileNumber} {
+      // Allow the specific demo ID to be read/written without auth for the AI Studio preview
+      allow get, write: if isSignedIn() || fileNumber == '00000001';
+      
+      // Allow appointments and user-specific data for demo ID or signed-in users
+      match /appointments/{appId} {
+        allow list, get, write: if isSignedIn() || fileNumber == '00000001';
+      }
+
+      match /userdata/{docId} {
+        allow read, write: if isSignedIn() || fileNumber == '00000001';
+      }
+    }
+
+    // --- Validation Helpers ---
+    function isLinkedToPatient(fileNumber) {
+      // Relational check: Does the user document point to this file?
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.patientFileNumber == fileNumber;
+    }
+
+    function isValidChatMessage(data) {
+      return data.keys().hasAll(['text', 'sender', 'timestamp']) &&
+             data.text is string && data.text.size() <= 2000 &&
+             data.sender in ['user', 'ai'] &&
+             data.timestamp == request.time;
+    }
+  }
+}
